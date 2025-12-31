@@ -58,8 +58,6 @@ func init() {
 
 	// Subcommands
 	rootCmd.AddCommand(configCmd)
-	rootCmd.AddCommand(historyCmd)
-	rootCmd.AddCommand(clearCmd)
 }
 
 func initConfig() {
@@ -110,28 +108,8 @@ func runRoot(cmd *cobra.Command, args []string) error {
 var configCmd = &cobra.Command{
 	Use:   "config",
 	Short: "Configure ohman",
-	Long:  "Interactive configuration for LLM and other settings",
+	Long:  "Interactive configuration for LLM settings",
 	RunE: func(cmd *cobra.Command, args []string) error {
 		return config.InteractiveSetup()
-	},
-}
-
-// historyCmd is the history command
-var historyCmd = &cobra.Command{
-	Use:   "history",
-	Short: "View session history",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Session history feature coming soon...")
-		return nil
-	},
-}
-
-// clearCmd is the clear command
-var clearCmd = &cobra.Command{
-	Use:   "clear",
-	Short: "Clear session cache",
-	RunE: func(cmd *cobra.Command, args []string) error {
-		fmt.Println("Cache cleared")
-		return nil
 	},
 }
