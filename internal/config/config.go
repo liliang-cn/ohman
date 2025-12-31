@@ -138,50 +138,22 @@ func InteractiveSetup() error {
 	reader := bufio.NewReader(os.Stdin)
 	cfg := DefaultConfig()
 
-	fmt.Println("🔧 Oh Man! Configuration Wizard")
-	fmt.Println("================================")
+	fmt.Println("🔧 Oh Man! Configuration")
+	fmt.Println("========================")
 	fmt.Println()
 
-	// Select Provider
-	fmt.Println("Select LLM provider:")
-	fmt.Println("  1. OpenAI (gpt-4o, gpt-4o-mini)")
-	fmt.Println("  2. Anthropic (Claude)")
-	fmt.Println("  3. Ollama (local models)")
-	fmt.Println("  4. Custom (OpenAI-compatible API)")
-	fmt.Print("Your choice [1]: ")
-	choice, _ := reader.ReadString('\n')
-	choice = strings.TrimSpace(choice)
-	if choice == "" {
-		choice = "1"
-	}
-
-	switch choice {
-	case "1":
-		cfg.LLM.Provider = "openai"
-		cfg.LLM.Model = "gpt-4o-mini"
-	case "2":
-		cfg.LLM.Provider = "anthropic"
-		cfg.LLM.Model = "claude-3-5-sonnet-20241022"
-	case "3":
-		cfg.LLM.Provider = "ollama"
-		cfg.LLM.Model = "llama3"
-		cfg.LLM.BaseURL = "http://localhost:11434"
-	case "4":
-		cfg.LLM.Provider = "custom"
-		fmt.Print("Enter API endpoint URL: ")
-		baseURL, _ := reader.ReadString('\n')
-		cfg.LLM.BaseURL = strings.TrimSpace(baseURL)
-	}
+	// API Base URL
+	fmt.Print("API Base URL (e.g., https://api.openai.com/v1): ")
+	baseURL, _ := reader.ReadString('\n')
+	cfg.LLM.BaseURL = strings.TrimSpace(baseURL)
 
 	// API Key
-	if cfg.LLM.Provider != "ollama" {
-		fmt.Print("Enter API Key: ")
-		apiKey, _ := reader.ReadString('\n')
-		cfg.LLM.APIKey = strings.TrimSpace(apiKey)
-	}
+	fmt.Print("API Key: ")
+	apiKey, _ := reader.ReadString('\n')
+	cfg.LLM.APIKey = strings.TrimSpace(apiKey)
 
 	// Model
-	fmt.Printf("Enter model name [%s]: ", cfg.LLM.Model)
+	fmt.Print("Model name [gpt-4o-mini]: ")
 	model, _ := reader.ReadString('\n')
 	model = strings.TrimSpace(model)
 	if model != "" {
@@ -194,9 +166,9 @@ func InteractiveSetup() error {
 	}
 
 	fmt.Println()
-	fmt.Println("✅ Configuration saved to:", GetConfigPath())
+	fmt.Println("✅ Saved to:", GetConfigPath())
 	fmt.Println()
-	fmt.Println("You can now use ohman! Try: ohman grep \"how to search recursively?\"")
+	fmt.Println("Try: ohman grep \"how to search recursively?\"")
 
 	return nil
 }
