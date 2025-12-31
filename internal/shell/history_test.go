@@ -40,7 +40,7 @@ func TestGetShellHookScript(t *testing.T) {
 	}{
 		{"zsh", false},
 		{"bash", false},
-		{"fish", true}, // Not supported yet
+		{"fish", false}, // Now supported
 		{"unknown", true},
 	}
 

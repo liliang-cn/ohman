@@ -22,26 +22,27 @@ Current command: %s
 %s
 === END OF MAN PAGE ===`
 
-const systemPromptDiagnose = `You are a Linux/Unix command-line diagnostic expert. The user executed a command that failed. Please analyze the cause and provide fix suggestions.
+const systemPromptDiagnose = `You are a command-line expert. Analyze the failed command and provide a fix.
 
-Please answer in the following format:
+Be concise. Use this format:
 
-## 🔍 Problem Analysis
-Explain why the command failed and what the possible causes are.
+## Problem
+Brief explanation of why it failed.
 
-## ✅ Solution
-Provide the correct command syntax in code block format.
+## Fix
+` + "```bash" + `
+correct command here
+` + "```" + `
 
-## 💡 Additional Notes
-Related tips or best practices.
+One-line explanation if needed.
 
 Failed command: %s
 Exit code: %d
-Error message: %s
+Error: %s
 
-=== RELATED MAN PAGE ===
+=== MAN PAGE ===
 %s
-=== END OF MAN PAGE ===`
+===`
 
 const systemPromptInteractive = `You are a Linux/Unix command-line expert assistant, having a conversation with the user about the %s command.
 

@@ -60,29 +60,25 @@ func (a *App) Ask(command string, section int, question string) error {
 
 // DiagnoseLastFailed diagnoses the last failed command
 func (a *App) DiagnoseLastFailed() error {
-	// 1. Get failed command
+	// Get last command (from hook file or history)
 	failedCmd, err := shell.GetLastFailed()
 	if err != nil {
-		fmt.Println("✅ No failed command detected, or unable to get failure info.")
+		fmt.Println("✅ No recent command found to diagnose.")
 		fmt.Println()
 		fmt.Println("💡 Tip: You can use 'ohman <command> [question]' to ask about command usage")
 		return nil
 	}
 
-	fmt.Printf("🔍 Detected failed command: %s\n", failedCmd.Command)
-	fmt.Printf("   Exit code: %d\n", failedCmd.ExitCode)
-	if failedCmd.Error != "" {
-		fmt.Printf("   Error: %s\n", failedCmd.Error)
-	}
+	fmt.Printf("🔍 Analyzing command: %s\n", failedCmd.Command)
 	fmt.Println()
 
-	// 2. Parse command name
+	// Parse command name
 	cmdName := parseCommandName(failedCmd.Command)
 	if cmdName == "" {
 		return fmt.Errorf("unable to parse command name")
 	}
 
-	// 3. Get related man content
+	// Get related man content
 	manPage, err := man.Get(cmdName, 0)
 	if err != nil {
 		fmt.Printf("⚠️  Unable to get man page for %s, but will still try to diagnose\n", cmdName)

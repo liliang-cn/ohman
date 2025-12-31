@@ -20,15 +20,75 @@ type FailedCommand struct {
 
 // GetLastFailed gets the last failed command
 func GetLastFailed() (*FailedCommand, error) {
-	// Method 1: Try reading the hook-recorded file
+	// Method 1: Try reading the hook-recorded file (most accurate)
 	if cmd, err := readFailedFromHook(); err == nil {
 		return cmd, nil
 	}
 
-	// Method 2: Try getting from shell built-in variables (requires user configuration)
-	// Here we provide a fallback solution
+	// Method 2: Fallback - read last command from shell history
+	// Assume the user just ran a failed command and immediately runs ohman
+	if cmd, err := getLastCommandFromHistory(); err == nil {
+		return cmd, nil
+	}
 
 	return nil, fmt.Errorf("unable to get failed command information")
+}
+
+// getLastCommandFromHistory reads the last command from shell history file
+func getLastCommandFromHistory() (*FailedCommand, error) {
+	history, err := GetHistory(5) // Get a few more in case some are ohman itself
+	if err != nil || len(history) == 0 {
+		return nil, fmt.Errorf("cannot read history")
+	}
+
+	shellType := DetectShell()
+
+	// Find the last non-ohman command
+	for i := len(history) - 1; i >= 0; i-- {
+		cmd := parseHistoryLine(history[i], shellType)
+		if cmd == "" {
+			continue
+		}
+		// Skip if command is ohman itself
+		if strings.HasPrefix(cmd, "ohman") || strings.HasPrefix(cmd, "./bin/ohman") {
+			continue
+		}
+		return &FailedCommand{
+			Command:  cmd,
+			ExitCode: 1, // Unknown exit code
+			Time:     time.Now(),
+		}, nil
+	}
+
+	return nil, fmt.Errorf("no previous command found")
+}
+
+// parseHistoryLine parses a history line based on shell type
+func parseHistoryLine(line, shellType string) string {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return ""
+	}
+
+	switch shellType {
+	case "zsh":
+		// Zsh extended history format: ": timestamp:0;command"
+		if strings.HasPrefix(line, ": ") {
+			if idx := strings.Index(line, ";"); idx != -1 {
+				return strings.TrimSpace(line[idx+1:])
+			}
+		}
+		return line
+	case "fish":
+		// Fish format: "- cmd: command" or just the command
+		if strings.HasPrefix(line, "- cmd: ") {
+			return strings.TrimSpace(line[7:])
+		}
+		return line
+	default:
+		// Bash and others: plain command
+		return line
+	}
 }
 
 // readFailedFromHook reads failed command from hook file
@@ -167,7 +227,109 @@ ohman_prompt_command() {
 }
 PROMPT_COMMAND="ohman_prompt_command${PROMPT_COMMAND:+; $PROMPT_COMMAND}"`
 
+	case "fish":
+		return `# Oh Man! Failed command recording hook
+function ohman_postexec --on-event fish_postexec
+    set -l exit_code $status
+    if test $exit_code -ne 0
+        echo "$exit_code|$argv|"(date +%s) > /tmp/.ohman_last_failed_%self
+    end
+end`
+
 	default:
 		return ""
 	}
+}
+
+// getShellConfigFile returns the shell config file path
+func getShellConfigFile(shellType string) string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+
+	switch shellType {
+	case "zsh":
+		return filepath.Join(home, ".zshrc")
+	case "bash":
+		// Prefer .bashrc, fallback to .bash_profile
+		bashrc := filepath.Join(home, ".bashrc")
+		if _, err := os.Stat(bashrc); err == nil {
+			return bashrc
+		}
+		return filepath.Join(home, ".bash_profile")
+	case "fish":
+		return filepath.Join(home, ".config", "fish", "config.fish")
+	default:
+		return ""
+	}
+}
+
+// IsHookInstalled checks if the shell hook is already installed
+func IsHookInstalled() bool {
+	shellType := DetectShell()
+	configFile := getShellConfigFile(shellType)
+	if configFile == "" {
+		return false
+	}
+
+	data, err := os.ReadFile(configFile)
+	if err != nil {
+		return false
+	}
+
+	content := string(data)
+	switch shellType {
+	case "zsh":
+		return strings.Contains(content, "ohman_precmd")
+	case "bash":
+		return strings.Contains(content, "ohman_prompt_command")
+	case "fish":
+		return strings.Contains(content, "ohman_postexec")
+	}
+	return false
+}
+
+// EnsureHookInstalled checks and installs the shell hook if needed
+// Returns: (installed, needsReload, error)
+func EnsureHookInstalled() (installed bool, needsReload bool, err error) {
+	if IsHookInstalled() {
+		return true, false, nil
+	}
+
+	shellType := DetectShell()
+	if shellType == "unknown" {
+		return false, false, fmt.Errorf("unsupported shell")
+	}
+
+	configFile := getShellConfigFile(shellType)
+	if configFile == "" {
+		return false, false, fmt.Errorf("cannot determine shell config file")
+	}
+
+	hookScript := GetShellHookScript(shellType)
+	if hookScript == "" {
+		return false, false, fmt.Errorf("no hook script for shell: %s", shellType)
+	}
+
+	// Ensure directory exists for fish
+	if shellType == "fish" {
+		dir := filepath.Dir(configFile)
+		if err := os.MkdirAll(dir, 0755); err != nil {
+			return false, false, fmt.Errorf("failed to create config directory: %w", err)
+		}
+	}
+
+	// Append hook to config file
+	f, err := os.OpenFile(configFile, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		return false, false, fmt.Errorf("failed to open config file: %w", err)
+	}
+	defer f.Close()
+
+	if _, err := f.WriteString("\n" + hookScript + "\n"); err != nil {
+		return false, false, fmt.Errorf("failed to write hook: %w", err)
+	}
+
+	return true, true, nil
 }
