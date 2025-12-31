@@ -1,0 +1,201 @@
+.TH OHMAN 1 "December 2025" "ohman 0.1.0" "User Commands"
+.SH NAME
+ohman \- AI-powered man page assistant
+.SH SYNOPSIS
+.B ohman
+[\fIOPTIONS\fR] [\fICOMMAND\fR] [\fIQUESTION\fR]
+.SH DESCRIPTION
+.B ohman
+is an intelligent command-line assistant that combines traditional man pages with
+Large Language Models (LLMs). It allows you to ask questions about command usage
+in natural language and provides automatic fix suggestions when commands fail.
+.PP
+When invoked without arguments after a failed command,
+.B ohman
+will automatically detect and diagnose the failure, providing helpful suggestions.
+.SH OPTIONS
+.TP
+.BR \-s ", " \-\-section " " \fINUM\fR
+Specify the man page section (1-8). Use this when a command exists in multiple
+sections.
+.TP
+.BR \-m ", " \-\-model " " \fIMODEL\fR
+Temporarily specify an LLM model, overriding the configured default.
+.TP
+.BR \-r ", " \-\-raw
+Display only the raw man page content without AI processing.
+.TP
+.BR \-i ", " \-\-interactive
+Force interactive mode, allowing multiple questions about the same command.
+.TP
+.BR \-c ", " \-\-config " " \fIFILE\fR
+Specify an alternate configuration file path.
+.TP
+.BR \-v ", " \-\-verbose
+Enable verbose output mode for debugging.
+.TP
+.BR \-h ", " \-\-help
+Display help information and exit.
+.TP
+.B \-\-version
+Display version information and exit.
+.SH SUBCOMMANDS
+.TP
+.B config
+Launch interactive configuration wizard to set up LLM provider, API key,
+and other settings.
+.TP
+.B history
+View session history of previous queries.
+.TP
+.B clear
+Clear the session cache.
+.SH USAGE MODES
+.SS Command Q&A Mode
+.PP
+Ask a specific question about a command:
+.PP
+.RS
+.nf
+ohman grep "How do I search recursively?"
+ohman find "How to find files larger than 100MB?"
+ohman tar "What do the xvf flags mean?"
+.fi
+.RE
+.SS Interactive Mode
+.PP
+Enter interactive mode for continuous questioning:
+.PP
+.RS
+.nf
+ohman git
+> How do I undo the last commit?
+> How do I view file history?
+> exit
+.fi
+.RE
+.SS Failed Command Diagnosis
+.PP
+After a command fails, run
+.B ohman
+without arguments:
+.PP
+.RS
+.nf
+$ chmod 777 /etc/passwd
+chmod: changing permissions of '/etc/passwd': Operation not permitted
+
+$ ohman
+# AI analyzes the failure and provides solutions
+.fi
+.RE
+.SH CONFIGURATION
+.PP
+The configuration file is located at:
+.PP
+.RS
+~/.config/ohman/config.yaml
+.RE
+.PP
+Configuration options include:
+.TP
+.B llm.provider
+LLM provider: openai, anthropic, ollama, or custom
+.TP
+.B llm.api_key
+API key for the LLM provider
+.TP
+.B llm.base_url
+Custom API endpoint URL (optional)
+.TP
+.B llm.model
+Model name (e.g., gpt-4o-mini, claude-3-5-sonnet)
+.TP
+.B llm.max_tokens
+Maximum output tokens (default: 4096)
+.TP
+.B llm.temperature
+Temperature parameter 0-2 (default: 0.7)
+.TP
+.B output.color
+Enable colored output (default: true)
+.TP
+.B output.markdown
+Enable Markdown rendering (default: true)
+.TP
+.B output.language
+Response language (default: en-US)
+.SH ENVIRONMENT
+.TP
+.B OHMAN_CONFIG
+Override the default configuration file path.
+.TP
+.B OHMAN_API_KEY
+Override the API key from the configuration file.
+.TP
+.B HTTP_PROXY\fR, \fBHTTPS_PROXY
+Proxy settings for API requests.
+.SH SHELL HOOKS
+.PP
+To enable automatic failed command detection, install the shell hook by running:
+.PP
+.RS
+ohman config
+.RE
+.PP
+Or manually add the hook to your shell configuration file. See the documentation
+for details.
+.SH EXAMPLES
+.PP
+Ask about grep options:
+.PP
+.RS
+ohman grep "How to show only matching filenames?"
+.RE
+.PP
+Query a specific man section:
+.PP
+.RS
+ohman -s 5 passwd "What is the config file format?"
+.RE
+.PP
+Use a specific model:
+.PP
+.RS
+ohman --model gpt-4 find "Complex query example"
+.RE
+.PP
+View raw man page:
+.PP
+.RS
+ohman --raw tar
+.RE
+.SH FILES
+.TP
+.I ~/.config/ohman/config.yaml
+User configuration file.
+.TP
+.I /tmp/.ohman_last_failed_*
+Temporary files for failed command detection.
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+General error or failed operation.
+.TP
+.B 2
+Configuration error (e.g., missing API key).
+.SH BUGS
+Report bugs at: https://github.com/liliang-cn/ohman/issues
+.SH AUTHOR
+Written by Li Liang.
+.SH COPYRIGHT
+Copyright \(co 2025 Li Liang. License MIT.
+.SH SEE ALSO
+.BR man (1),
+.BR info (1),
+.BR tldr (1)
+.PP
+Full documentation: https://github.com/liliang-cn/ohman
