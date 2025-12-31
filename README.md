@@ -6,11 +6,10 @@
 
 ## ✨ Features
 
-- 🔍 **Smart Q&A**: Send man page content to LLM and ask questions in natural language
-- 🔧 **Failure Diagnosis**: Automatically get the last failed command and provide fix suggestions
-- � **Streaming Output**: Real-time streaming responses for better user experience
-- 🎯 **OpenAI Compatible**: Works with OpenAI, DeepSeek, Azure OpenAI, and any OpenAI-compatible API
-- 💾 **Session Memory**: Supports multi-turn conversations for in-depth command exploration
+- 🔍 **Smart Q&A**: Ask questions about any command in natural language
+- 🔧 **Failure Diagnosis**: Automatically diagnose the last failed command and suggest fixes
+- 📡 **Streaming Output**: Real-time streaming responses for better user experience
+- 🎯 **OpenAI Compatible**: Works with any OpenAI-compatible API (OpenAI, DeepSeek, Ollama, etc.)
 - 🖥️ **Cross-Platform**: Supports Linux and macOS
 
 ## 📦 Installation
