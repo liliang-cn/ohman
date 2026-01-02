@@ -75,3 +75,31 @@ func GetWhatis(command string) (string, error) {
 	}
 	return strings.TrimSpace(string(output)), nil
 }
+
+// GetHelpOutput tries to get help output using --help, -h, or -help flags
+func GetHelpOutput(command string) (string, error) {
+	// Common help flags to try, in order of preference
+	helpFlags := []string{"--help", "-h", "-help"}
+
+	for _, flag := range helpFlags {
+		cmd := exec.Command(command, flag)
+		output, err := cmd.Output()
+		if err == nil {
+			content := strings.TrimSpace(string(output))
+			if content != "" {
+				return content, nil
+			}
+		}
+		// Try with combined stderr (some programs output help to stderr)
+		cmd = exec.Command(command, flag)
+		output, err = cmd.CombinedOutput()
+		if err == nil {
+			content := strings.TrimSpace(string(output))
+			if content != "" {
+				return content, nil
+			}
+		}
+	}
+
+	return "", fmt.Errorf("no help output found for %s", command)
+}

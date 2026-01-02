@@ -10,21 +10,30 @@ import (
 	"github.com/liliang-cn/ohman/internal/llm"
 	"github.com/liliang-cn/ohman/internal/man"
 	"github.com/liliang-cn/ohman/internal/output"
+	"github.com/liliang-cn/ohman/internal/session"
 	"github.com/liliang-cn/ohman/internal/shell"
 )
 
 // App is the main application structure
 type App struct {
-	cfg       *config.Config
-	llmClient llm.Client
-	renderer  *output.Renderer
+	cfg           *config.Config
+	llmClient     llm.Client
+	renderer      *output.Renderer
+	sessionMgr    *session.Manager
 }
 
 // New creates a new application instance
 func New(cfg *config.Config) *App {
+	sessionMgr, err := session.New()
+	if err != nil {
+		// If session manager fails to initialize, continue without it
+		sessionMgr = nil
+	}
+
 	return &App{
-		cfg:      cfg,
-		renderer: output.NewRenderer(cfg.Output),
+		cfg:        cfg,
+		renderer:   output.NewRenderer(cfg.Output),
+		sessionMgr: sessionMgr,
 	}
 }
 
@@ -47,9 +56,19 @@ func (a *App) Ask(command string, section int, question string) error {
 
 	fmt.Println("🤔 Thinking...")
 	fmt.Println()
-	_, err = client.Chat(messages)
+	response, err := client.Chat(messages)
 	if err != nil {
 		return fmt.Errorf("failed to call LLM: %w", err)
+	}
+
+	// 4. Save to session history
+	if a.sessionMgr != nil {
+		_ = a.sessionMgr.Add(session.Entry{
+			Command:  command,
+			Question: question,
+			Answer:   response.Content,
+			Type:     "question",
+		})
 	}
 
 	// Streaming output is already printed, just add a newline
@@ -80,9 +99,19 @@ func (a *App) DiagnoseLastFailed() error {
 
 	// Get related man content
 	manPage, err := man.Get(cmdName, 0)
+	content := "(no documentation available)"
 	if err != nil {
-		fmt.Printf("⚠️  Unable to get man page for %s, but will still try to diagnose\n", cmdName)
-		manPage = &man.ManPage{Command: cmdName, Content: "(man page not available)"}
+		// Try --help flag as fallback
+		fmt.Printf("⚠️  No man page for %s, trying --help...\n", cmdName)
+		helpOutput, helpErr := man.GetHelpOutput(cmdName)
+		if helpErr == nil {
+			content = helpOutput
+			fmt.Printf("✅ Got help output for %s\n", cmdName)
+		} else {
+			fmt.Printf("⚠️  Unable to get documentation for %s, but will still try to diagnose\n", cmdName)
+		}
+	} else {
+		content = manPage.Content
 	}
 
 	// 4. Initialize LLM client
@@ -92,13 +121,22 @@ func (a *App) DiagnoseLastFailed() error {
 	}
 
 	// 5. Build diagnose prompt and call LLM
-	messages := llm.BuildDiagnosePrompt(failedCmd.Command, failedCmd.ExitCode, failedCmd.Error, manPage.Content)
+	messages := llm.BuildDiagnosePrompt(failedCmd.Command, failedCmd.ExitCode, failedCmd.Error, content)
 
 	fmt.Println("🔧 Analyzing...")
 	fmt.Println()
-	_, err = client.Chat(messages)
+	response, err := client.Chat(messages)
 	if err != nil {
 		return fmt.Errorf("failed to call LLM: %w", err)
+	}
+
+	// Save to session history
+	if a.sessionMgr != nil {
+		_ = a.sessionMgr.Add(session.Entry{
+			Command: cmdName,
+			Answer:  response.Content,
+			Type:    "diagnose",
+		})
 	}
 
 	// Streaming output is already printed, just add a newline
@@ -158,6 +196,16 @@ func (a *App) Interactive(command string, section int) error {
 		// Add assistant response to history
 		history = append(history, llm.Message{Role: "assistant", Content: response.Content})
 
+		// Save to session history
+		if a.sessionMgr != nil {
+			_ = a.sessionMgr.Add(session.Entry{
+				Command:  command,
+				Question: question,
+				Answer:   response.Content,
+				Type:     "interactive",
+			})
+		}
+
 		// Streaming output is already printed, just add newlines
 		fmt.Println()
 		fmt.Println()
@@ -174,6 +222,40 @@ func (a *App) ShowManPage(command string, section int) error {
 	}
 
 	fmt.Println(manPage.Content)
+	return nil
+}
+
+// AnalyzeError analyzes an error message and provides suggestions
+func (a *App) AnalyzeError(errorMsg string) error {
+	// Initialize LLM client
+	client, err := a.getLLMClient()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("🔍 Analyzing error message...")
+	fmt.Println()
+
+	// Build error analysis prompt
+	messages := llm.BuildErrorPrompt(errorMsg)
+
+	response, err := client.Chat(messages)
+	if err != nil {
+		return fmt.Errorf("failed to call LLM: %w", err)
+	}
+
+	// Save to session history
+	if a.sessionMgr != nil {
+		_ = a.sessionMgr.Add(session.Entry{
+			Question: errorMsg,
+			Answer:   response.Content,
+			Type:     "error",
+		})
+	}
+
+	// Streaming output is already printed, just add a newline
+	fmt.Println()
+
 	return nil
 }
 

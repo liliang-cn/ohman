@@ -55,6 +55,24 @@ The user has loaded the man page for this command, and you can answer questions 
 %s
 === END OF MAN PAGE ===`
 
+const systemPromptError = `You are a Linux/Unix command-line expert. Analyze the following error message and provide a solution.
+
+Be concise and use this format:
+
+## Problem
+Brief explanation of what went wrong.
+
+## Solution
+` + "```bash" + `
+fixed command here
+` + "```" + `
+
+One-line explanation if needed.
+
+=== ERROR MESSAGE ===
+%s
+=== END OF ERROR ===`
+
 // BuildQuestionPrompt builds a question prompt
 func BuildQuestionPrompt(command, manContent, question string) []Message {
 	// Limit man content length to avoid exceeding token limits
@@ -102,6 +120,20 @@ func BuildInteractivePrompt(command, manContent string) []Message {
 		{
 			Role:    "system",
 			Content: fmt.Sprintf(systemPromptInteractive, command, manContent),
+		},
+	}
+}
+
+// BuildErrorPrompt builds an error analysis prompt
+func BuildErrorPrompt(errorMsg string) []Message {
+	return []Message{
+		{
+			Role:    "system",
+			Content: fmt.Sprintf(systemPromptError, errorMsg),
+		},
+		{
+			Role:    "user",
+			Content: "Please analyze this error and provide a fix.",
 		},
 	}
 }

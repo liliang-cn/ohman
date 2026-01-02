@@ -105,3 +105,50 @@ func TestGetWhatis(t *testing.T) {
 		t.Error("GetWhatis() returned empty description")
 	}
 }
+
+func TestGetHelpOutput(t *testing.T) {
+	tests := []struct {
+		name    string
+		command string
+		wantErr bool
+	}{
+		{
+			name:    "command with --help flag (ls)",
+			command: "ls",
+			wantErr: false,
+		},
+		{
+			name:    "command with --help flag (grep)",
+			command: "grep",
+			wantErr: false,
+		},
+		{
+			name:    "nonexistent command",
+			command: "nonexistentcmd123456",
+			wantErr: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			output, err := GetHelpOutput(tt.command)
+			if (err != nil) != tt.wantErr {
+				t.Errorf("GetHelpOutput() error = %v, wantErr %v", err, tt.wantErr)
+				return
+			}
+			if !tt.wantErr {
+				if output == "" {
+					t.Error("GetHelpOutput() returned empty output")
+				}
+				t.Logf("Help output preview (first 100 chars): %s...", output[:min(100, len(output))])
+			}
+		})
+	}
+}
+
+func min(a, b int) int {
+	if a < b {
+		return a
+	}
+	return b
+}
