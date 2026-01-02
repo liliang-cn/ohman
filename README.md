@@ -8,9 +8,12 @@
 
 - 🔍 **Smart Q&A**: Ask questions about any command in natural language
 - 🔧 **Failure Diagnosis**: Automatically diagnose the last failed command and suggest fixes
+- 💬 **Error Analysis**: Paste error messages directly for instant analysis and solutions
+- 📝 **Session History**: View and manage your query history with `ohman history` and `ohman clear`
 - 📡 **Streaming Output**: Real-time streaming responses for better user experience
 - 🎯 **OpenAI Compatible**: Works with any OpenAI-compatible API (OpenAI, DeepSeek, Ollama, etc.)
 - 🖥️ **Cross-Platform**: Supports Linux and macOS
+- 🆘 **Smart Fallback**: Tries `--help` flag when man page is not available
 
 ## 📦 Installation
 
@@ -161,6 +164,28 @@ chmod: changing permissions of '/etc/passwd': Operation not permitted
 
 $ ohman
 # AI will explain why it failed and provide the correct approach
+```
+
+#### Case 5: Direct Error Message Analysis (New!)
+
+```bash
+# Simply paste any error message
+ohman "error: failed to push some refs to 'https://github.com/user/repo.git'"
+
+ohman "bash: ./script.sh: Permission denied"
+
+ohman "segmentation fault (core dumped)"
+# AI detects error keywords and provides solutions
+```
+
+#### Case 6: Session Management
+
+```bash
+# View your query history
+ohman history
+
+# Clear all history
+ohman clear
 ```
 
 ### Advanced Usage
