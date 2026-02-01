@@ -4,7 +4,7 @@ import "fmt"
 
 // Version variables, injected via ldflags
 var (
-	Version = "v0.4.5"
+	Version = "v0.4.6"
 	Commit    = "unknown"
 	BuildTime = "unknown"
 )
