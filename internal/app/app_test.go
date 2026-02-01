@@ -1,7 +1,11 @@
 package app
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
+
+	"github.com/liliang-cn/ohman/internal/config"
 )
 
 func TestParseCommandName(t *testing.T) {
@@ -49,5 +53,58 @@ func TestParseCommandName(t *testing.T) {
 				t.Errorf("parseCommandName(%q) = %q, want %q", tt.fullCmd, result, tt.expected)
 			}
 		})
+	}
+}
+
+func TestAnalyzeLogFile(t *testing.T) {
+	tmpDir := t.TempDir()
+	logFile := filepath.Join(tmpDir, "test.log")
+
+	content := `2025-02-01 10:00:00 INFO Application started
+2025-02-01 10:00:01 ERROR Database connection failed
+2025-02-01 10:00:02 WARN Retrying...
+`
+
+	if err := os.WriteFile(logFile, []byte(content), 0644); err != nil {
+		t.Fatalf("Failed to create test log file: %v", err)
+	}
+
+	cfg := &config.Config{}
+	application := New(cfg)
+
+	err := application.AnalyzeLogFile(logFile, 0)
+	if err != nil {
+		t.Logf("AnalyzeLogFile returned error (expected without LLM config): %v", err)
+	}
+}
+
+func TestAnalyzeLogContent(t *testing.T) {
+	content := `2025-02-01 10:23:45 ERROR Database connection failed
+2025-02-01 10:23:46 WARN Retrying connection`
+
+	cfg := &config.Config{}
+	application := New(cfg)
+
+	err := application.AnalyzeLogContent(content)
+	if err != nil {
+		t.Logf("AnalyzeLogContent returned error (expected without LLM config): %v", err)
+	}
+}
+
+func TestChat(t *testing.T) {
+	cfg := &config.Config{}
+	application := New(cfg)
+
+	// Test chat without log context
+	err := application.Chat("")
+	if err != nil {
+		t.Logf("Chat returned error (expected without LLM config): %v", err)
+	}
+
+	// Test chat with log context
+	logContent := "2025-02-01 ERROR: Test error"
+	err = application.Chat(logContent)
+	if err != nil {
+		t.Logf("Chat with log context returned error (expected without LLM config): %v", err)
 	}
 }

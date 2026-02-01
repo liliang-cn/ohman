@@ -9,6 +9,8 @@
 - 🔍 **Smart Q&A**: Ask questions about any command in natural language
 - 🔧 **Failure Diagnosis**: Automatically diagnose the last failed command and suggest fixes
 - 💬 **Error Analysis**: Paste error messages directly for instant analysis and solutions
+- 📊 **Log Analysis**: Analyze log files or paste log content for AI-powered insights
+- 💭 **Interactive Chat**: Start a chat session with AI, optionally with log context
 - 📝 **Session History**: View and manage your query history with `ohman history` and `ohman clear`
 - 📡 **Streaming Output**: Real-time streaming responses for better user experience
 - 🎯 **OpenAI Compatible**: Works with any OpenAI-compatible API (OpenAI, DeepSeek, Ollama, etc.)
@@ -166,7 +168,7 @@ $ ohman
 # AI will explain why it failed and provide the correct approach
 ```
 
-#### Case 5: Direct Error Message Analysis (New!)
+#### Case 5: Direct Error Message Analysis
 
 ```bash
 # Simply paste any error message
@@ -178,7 +180,58 @@ ohman "segmentation fault (core dumped)"
 # AI detects error keywords and provides solutions
 ```
 
-#### Case 6: Session Management
+#### Case 6: Log Analysis
+
+```bash
+# Analyze a log file
+ohman log /var/log/app/error.log
+
+# Analyze with limited entries
+ohman log -n 100 /var/log/nginx/access.log
+
+# Paste log content directly
+ohman log "2025-02-01 10:23:45 [ERROR] Database connection timeout
+2025-02-01 10:23:46 [WARN] Retrying connection..."
+```
+
+#### Case 7: Pipe Support
+
+```bash
+# Analyze logs from pipe
+tail -f /var/log/app.log | ohman log
+
+# Filter and analyze
+grep ERROR /var/log/app.log | ohman log
+
+# Analyze recent errors
+tail -n 100 /var/log/syslog | ohman log
+
+# Use with journalctl
+journalctl -u nginx | ohman log
+
+# Chain multiple commands
+journalctl -f -u docker | grep ERROR | ohman log
+
+# Real-time monitoring
+tail -f /var/log/app.log | grep ERROR | ohman log
+```
+
+#### Case 8: Systemd Journalctl Analysis
+
+```bash
+# Analyze systemd service logs
+ohman log -u nginx.service
+
+# Analyze with limit
+ohman log -u docker -n 50
+
+# Analyze by unit name
+ohman log --unit mysql.service
+
+# AI will analyze journalctl logs and provide insights
+```
+
+#### Case 9: Session Management
 
 ```bash
 # View your query history
@@ -186,6 +239,22 @@ ohman history
 
 # Clear all history
 ohman clear
+```
+
+#### Case 10: Interactive Chat
+
+```bash
+# Start a general chat session
+ohman chat
+
+# Chat with log context
+ohman chat /var/log/app/error.log
+
+# Ask follow-up questions
+> What errors occurred?
+> What caused the timeout?
+> How can I fix this?
+> exit
 ```
 
 ### Advanced Usage
@@ -218,11 +287,13 @@ Usage:
   ohman [command]
 
 Available Commands:
+  chat        Start an interactive chat session
   clear       Clear session cache
   completion  Generate the autocompletion script for the specified shell
   config      Configure ohman
   help        Help about any command
   history     View session history
+  log         Analyze log files or log content
 
 Flags:
   -c, --config string   config file path
@@ -238,6 +309,10 @@ Examples:
   ohman grep "How to only show matching filenames?"
   ohman -s 5 passwd "What's the config file format?"
   ohman -c /path/to/config.yaml tar "How to extract?"
+  ohman log /var/log/app/error.log
+  ohman log -n 50 "2025-02-01 ERROR: Connection timeout"
+  ohman log -u nginx.service
+  ohman log --unit docker -n 100
   ohman tar
   ohman
 ```

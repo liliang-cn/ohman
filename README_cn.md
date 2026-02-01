@@ -9,6 +9,9 @@
 - 🔍 **智能问答**: 用自然语言询问任何命令的使用方法
 - 🔧 **失败诊断**: 自动诊断上一个失败的命令并给出修复建议
 - 💬 **错误分析**: 直接粘贴错误消息，立即获得分析和解决方案
+- 📊 **日志分析**: 分析日志文件、systemd 服务日志或直接粘贴日志内容，获得 AI 驱动的洞察
+- 🔌 **管道支持**: 支持通过管道（pipe）传递日志数据，实现实时分析和过滤
+- 💭 **交互式聊天**: 启动聊天会话，可选择附上日志进行深入讨论
 - 📝 **会话历史**: 使用 `ohman history` 和 `ohman clear` 查看和管理查询历史
 - 📡 **流式输出**: 实时流式响应，提供更好的用户体验
 - 🎯 **OpenAI 兼容**: 支持任何 OpenAI 兼容的 API（OpenAI、DeepSeek、Ollama 等）
@@ -166,7 +169,7 @@ $ ohman
 # AI 会解释为什么失败并提供正确的方法
 ```
 
-#### 场景 5：直接错误消息分析（新功能！）
+#### 场景 5：直接错误消息分析
 
 ```bash
 # 只需粘贴任何错误消息
@@ -178,7 +181,60 @@ ohman "segmentation fault (core dumped)"
 # AI 会检测错误关键词并提供解决方案
 ```
 
-#### 场景 6：会话管理
+#### 场景 6：日志分析
+
+```bash
+# 分析日志文件
+ohman log /var/log/app/error.log
+
+# 分析并限制条目数
+ohman log -n 100 /var/log/nginx/access.log
+
+# 直接粘贴日志内容
+ohman log "2025-02-01 10:23:45 [ERROR] Database connection timeout
+2025-02-01 10:23:46 [WARN] Retrying connection..."
+
+# AI 会分析日志，识别错误，并提供解决方案
+```
+
+#### 场景 7：Systemd 服务日志分析
+
+```bash
+# 分析 systemd 服务日志
+ohman log -u nginx.service
+
+# 限制分析条目数
+ohman log -u docker -n 50
+
+# 使用完整格式
+ohman log --unit mysql.service
+
+# AI 会分析 journalctl 日志并提供深入洞察
+```
+
+#### 场景 8：管道支持（新功能！）
+
+```bash
+# 通过管道分析日志
+tail -f /var/log/app.log | ohman log
+
+# 过滤后分析
+grep ERROR /var/log/app.log | ohman log
+
+# 分析最近的错误
+tail -n 100 /var/log/syslog | ohman log
+
+# 与 journalctl 配合使用
+journalctl -u nginx | ohman log
+
+# 链接多个命令
+journalctl -f -u docker | grep ERROR | ohman log
+
+# 实时监控
+tail -f /var/log/app.log | grep ERROR | ohman log
+```
+
+#### 场景 9：会话管理
 
 ```bash
 # 查看查询历史
@@ -186,6 +242,22 @@ ohman history
 
 # 清空所有历史
 ohman clear
+```
+
+#### 场景 10：交互式聊天（新功能！）
+
+```bash
+# 启动通用聊天会话
+ohman chat
+
+# 带日志上下文的聊天
+ohman chat /var/log/app/error.log
+
+# 追问关于日志的问题
+> 发生了什么错误？
+> 超时是什么原因导致的？
+> 如何修复这个问题？
+> exit
 ```
 
 ### 高级用法
@@ -218,11 +290,13 @@ ohman - AI 驱动的 man 页面助手
   ohman [命令]
 
 可用命令:
+  chat        启动交互式聊天会话
   clear       清空会话缓存
   completion  为指定的 shell 生成自动补全脚本
   config      配置 ohman
   help        关于任何命令的帮助
   history     查看会话历史
+  log         分析日志文件、systemd 服务日志或通过管道接收日志内容
 
 标志:
   -c, --config string   配置文件路径
@@ -238,6 +312,11 @@ ohman - AI 驱动的 man 页面助手
   ohman grep "如何只显示匹配的文件名？"
   ohman -s 5 passwd "配置文件格式是什么？"
   ohman -c /path/to/config.yaml tar "如何解压？"
+  ohman log /var/log/app/error.log
+  ohman log -n 50 "2025-02-01 ERROR: Connection timeout"
+  ohman log -u nginx.service
+  ohman log --unit docker -n 100
+  tail -f /var/log/app.log | ohman log
   ohman tar
   ohman
 ```
@@ -250,7 +329,7 @@ ohman - AI 驱动的 man 页面助手
 ├─────────────────────────────────────────────────────────────────┤
 │  ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌──────────┐  │
 │  │  用户    │───>│  解析    │───>│  获取    │───>│  构建    │  │
-│  │  输入    │    │  参数    │    │  Man     │    │  提示    │  │
+│  │  输入    │    │  参数    │    │  日志    │    │  提示    │  │
 │  └──────────┘    └──────────┘    └──────────┘    └──────────┘  │
 │                                         │              │        │
 │                                         │              ▼        │
@@ -260,6 +339,53 @@ ohman - AI 驱动的 man 页面助手
 │  └──────────┘    └──────────┘    └──────────┘    └──────────┘  │
 └─────────────────────────────────────────────────────────────────┘
 ```
+
+### 日志分析流程
+
+ohman 的日志分析支持三种输入方式：
+
+1. **文件分析**
+   ```
+   ohman log /var/log/app/error.log
+   ```
+   - 读取指定的日志文件
+   - 解析日志级别（DEBUG、INFO、WARN、ERROR、FATAL）
+   - 自动识别日志类型（应用、系统、访问、错误日志）
+   - 统计各级别数量
+   - 提取样本供 AI 分析
+
+2. **systemd Journalctl 分析**
+   ```
+   ohman log -u nginx.service
+   ```
+   - 调用 `journalctl -u <unit>` 获取服务日志
+   - 支持常见的 systemd 单元类型
+   - 可使用 `-n` 参数限制条目数
+   - 智能识别服务名称（如 nginx、docker、mysql）
+
+3. **管道输入**
+   ```
+   tail -f /var/log/app.log | ohman log
+   ```
+   - 自动检测管道输入
+   - 从 stdin 读取数据
+   - 支持与 grep、awk、sed 等命令组合
+   - 适合实时监控和过滤场景
+
+### 日志分析能力
+
+AI 会自动识别：
+- **错误模式** - 重复的错误和根本原因
+- **警告趋势** - 潜在问题的早期信号
+- **性能问题** - 超时、资源耗尽等
+- **配置错误** - 配置文件或参数问题
+- **依赖问题** - 数据库连接、API 调用失败等
+
+并提供：
+- **问题诊断** - 清晰的问题描述
+- **根本原因** - 分析问题的真正原因
+- **具体解决方案** - 可执行的修复命令和配置
+- **预防措施** - 避免类似问题的建议
 
 ### 错误检测规则
 
@@ -287,10 +413,16 @@ ohman - AI 驱动的 man 页面助手
 
 ## 🔐 隐私与安全
 
-- 📤 **发送的数据**: 仅将 man 页面内容和你的问题发送到 LLM API
+- 📤 **发送的数据**: 仅将 man 页面内容、日志内容和你的问题发送到 LLM API
 - 🔒 **API 密钥安全**: API 密钥存储在本地配置文件中，权限为 600
 - 🚫 **无遥测**: 不收集任何使用数据
 - 💻 **本地选项**: 支持任何 OpenAI 兼容的本地 LLM 服务器（LM Studio、Ollama with OpenAI API 等）
+
+### 日志数据隐私
+
+- 日志内容仅发送到你配置的 LLM API，不会存储或分享
+- 不从你的系统读取敏感信息（除非显式指定日志文件）
+- 支持使用本地 LLM 进行完全离线的日志分析
 
 ## 🤝 贡献
 
@@ -302,4 +434,123 @@ MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
 
 ---
 
-**Oh Man!** - 因为读 man 页本不该这么痛苦 🎉
+## 💡 高级日志分析技巧
+
+### 实时监控
+
+```bash
+# 实时监控应用错误
+tail -f /var/log/app.log | grep ERROR | ohman log
+
+# 监控多个服务的错误
+journalctl -f -u nginx -u docker | grep -i error | ohman log
+
+# 结合系统日志
+tail -f /var/log/syslog /var/log/app.log | grep -E "ERROR|FATAL" | ohman log
+```
+
+### 批量分析
+
+```bash
+# 分析最近 1000 行的错误
+tail -n 1000 /var/log/app.log | ohman log
+
+# 分析所有日志文件中的错误
+cat /var/log/app/*.log | grep CRITICAL | ohman log
+
+# 按日期筛选后分析
+grep "2025-02-01" /var/log/app.log | ohman log
+```
+
+### 与其他工具组合
+
+```bash
+# 使用 awk 过滤特定字段
+awk '/ERROR/ {print $0}' /var/log/app.log | ohman log
+
+# 使用 sed 清理格式后分析
+sed 's/\[.*\]//' /var/log/app.log | ohman log
+
+# 使用 jq 解析 JSON 日志
+cat app.log | jq -r '. | select(.level=="ERROR") | .message' | ohman log
+```
+
+### Systemd 日志高级用法
+
+```bash
+# 查看今天的错误
+journalctl --since today -u nginx | ohman log
+
+# 查看特定时间范围
+journalctl --since "1 hour ago" -u docker | ohman log
+
+# 查看引导过程的日志
+journalctl -b | ohman log
+
+# 组合多个单元
+journalctl -u nginx -u mysql | ohman log
+```
+
+## ❓ 常见问题
+
+### Q: ohman log 和 journalctl 有什么区别？
+
+A: `ohman log` 可以直接分析 journalctl 的输出，但提供了：
+- AI 驱动的智能分析
+- 自动错误识别和分类
+- 可执行的解决方案和命令
+- 与其他日志文件统一的分析接口
+
+### Q: 支持哪些日志格式？
+
+A: ohman 支持多种日志格式：
+- 标准时间戳格式：`2025-02-01 10:23:45`
+- 括号级别格式：`[ERROR] Failed...`
+- Systemd 格式：`Feb 01 10:23:45 host service[123]: ...`
+- 自定义格式：自动识别错误级别和消息
+
+### Q: 管道输入的优先级如何？
+
+A: 管道输入具有最高优先级：
+1. 管道输入（如果有）
+2. `-u/--unit` 参数（systemd 服务）
+3. 文件路径（如果文件存在）
+4. 日志内容字符串
+
+### Q: 可以分析多大的日志文件？
+
+A: ohman 可以处理任意大小的日志文件：
+- 默认分析全部内容
+- 使用 `-n` 参数限制分析的条目数
+- 大文件建议使用管道过滤后再分析：
+  ```bash
+  tail -n 1000 /var/log/app.log | ohman log
+  ```
+
+### Q: 日志分析会修改原文件吗？
+
+A: 不会。ohman 只是读取和分析日志内容，不会：
+- 修改原始日志文件
+- 创建额外的日志文件
+- 存储日志内容到其他位置
+
+### Q: 如何确保敏感信息不被发送？
+
+A: 使用本地 LLM 或过滤敏感信息：
+```bash
+# 过滤敏感信息后再分析
+sed 's/password=****/password=[REDACTED]/' app.log | ohman log
+
+# 或使用本地 LLM 完全离线分析
+ohman log app.log --model local-model
+```
+
+## 📚 更多资源
+
+- [设计文档](docs/DESIGN.md) - 技术架构和设计决策
+- [使用指南](docs/USAGE.md) - 详细的使用说明和示例
+- [更新日志](CHANGELOG.md) - 版本历史和更新内容
+
+---
+
+**Oh Man!** - 让读 man 页和查日志不再痛苦 🎉

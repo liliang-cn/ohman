@@ -73,6 +73,35 @@ One-line explanation if needed.
 %s
 === END OF ERROR ===`
 
+const systemPromptLog = `You are a log analysis expert. Analyze the following log content and provide insights.
+
+When analyzing:
+1. Identify the root causes of errors and warnings
+2. Provide specific solutions for each issue found
+3. Suggest preventive measures
+4. Highlight patterns or recurring issues
+5. If applicable, recommend configuration or code changes
+
+Use this format:
+
+## Summary
+Brief overview of the log analysis.
+
+## Issues Found
+For each issue:
+- **Issue**: Description of the problem
+- **Root Cause**: What caused it
+- **Solution**: ` + "```bash" + `
+  specific fix or command
+  ` + "```" + `
+
+## Recommendations
+Actionable recommendations to prevent future issues.
+
+=== LOG ANALYSIS ===
+%s
+=== END OF LOG ANALYSIS ===`
+
 // BuildQuestionPrompt builds a question prompt
 func BuildQuestionPrompt(command, manContent, question string) []Message {
 	// Limit man content length to avoid exceeding token limits
@@ -134,6 +163,20 @@ func BuildErrorPrompt(errorMsg string) []Message {
 		{
 			Role:    "user",
 			Content: "Please analyze this error and provide a fix.",
+		},
+	}
+}
+
+// BuildLogPrompt builds a log analysis prompt
+func BuildLogPrompt(logContent string) []Message {
+	return []Message{
+		{
+			Role:    "system",
+			Content: fmt.Sprintf(systemPromptLog, logContent),
+		},
+		{
+			Role:    "user",
+			Content: "Please analyze these logs and provide solutions for any issues found.",
 		},
 	}
 }

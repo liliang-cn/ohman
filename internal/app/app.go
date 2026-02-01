@@ -8,6 +8,7 @@ import (
 
 	"github.com/liliang-cn/ohman/internal/config"
 	"github.com/liliang-cn/ohman/internal/llm"
+	"github.com/liliang-cn/ohman/internal/log"
 	"github.com/liliang-cn/ohman/internal/man"
 	"github.com/liliang-cn/ohman/internal/output"
 	"github.com/liliang-cn/ohman/internal/session"
@@ -16,10 +17,10 @@ import (
 
 // App is the main application structure
 type App struct {
-	cfg           *config.Config
-	llmClient     llm.Client
-	renderer      *output.Renderer
-	sessionMgr    *session.Manager
+	cfg        *config.Config
+	llmClient  llm.Client
+	renderer   *output.Renderer
+	sessionMgr *session.Manager
 }
 
 // New creates a new application instance
@@ -292,4 +293,264 @@ func parseCommandName(fullCmd string) string {
 		}
 	}
 	return ""
+}
+
+// Chat starts an interactive chat session with optional log context
+func (a *App) Chat(logContext string) error {
+	// Initialize LLM client
+	client, err := a.getLLMClient()
+	if err != nil {
+		return err
+	}
+
+	// Build initial messages
+	var messages []llm.Message
+
+	// If log context is provided, add it as system prompt
+	if logContext != "" {
+		messages = append(messages, llm.Message{
+			Role: "system",
+			Content: "You are a log analysis expert. The following log content has been analyzed. " +
+				"Use this context to answer the user's questions about the logs.\n\n" + logContext,
+		})
+		fmt.Println("💬 Chat mode started with log context")
+		fmt.Println("   You can ask questions about the analyzed logs.")
+		fmt.Println()
+	} else {
+		messages = append(messages, llm.Message{
+			Role: "system",
+			Content: "You are a Linux/Unix command-line expert assistant. " +
+				"Help users with commands, errors, and technical problems.",
+		})
+		fmt.Println("💬 Chat mode started")
+		fmt.Println("   Type your question or 'exit' to quit.")
+		fmt.Println()
+	}
+
+	reader := bufio.NewReader(os.Stdin)
+
+	for {
+		fmt.Print("❓ ")
+		input, err := reader.ReadString('\n')
+		if err != nil {
+			break
+		}
+
+		question := strings.TrimSpace(input)
+		if question == "" {
+			continue
+		}
+
+		// Check for exit commands
+		if question == "exit" || question == "quit" || question == "q" || question == "bye" {
+			fmt.Println("👋 Goodbye!")
+			break
+		}
+
+		// Add user question to history
+		messages = append(messages, llm.Message{
+			Role:    "user",
+			Content: question,
+		})
+
+		// Call LLM
+		fmt.Println()
+		response, err := client.Chat(messages)
+		if err != nil {
+			fmt.Printf("❌ Error: %v\n", err)
+			continue
+		}
+
+		// Add assistant response to history
+		messages = append(messages, llm.Message{
+			Role:    "assistant",
+			Content: response.Content,
+		})
+
+		// Save to session history
+		if a.sessionMgr != nil {
+			entryType := "chat"
+			if logContext != "" {
+				entryType = "chat-log"
+			}
+			_ = a.sessionMgr.Add(session.Entry{
+				Command:  "chat",
+				Question: question,
+				Answer:   response.Content,
+				Type:     entryType,
+			})
+		}
+
+		// Add newline for readability
+		fmt.Println()
+		fmt.Println()
+	}
+
+	return nil
+}
+
+// AnalyzeLogFile analyzes a log file and provides AI-powered insights
+func (a *App) AnalyzeLogFile(filePath string, limit int) error {
+	// Initialize LLM client
+	client, err := a.getLLMClient()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("📋 Analyzing log file: %s\n", filePath)
+	fmt.Println()
+
+	// Analyze the log file
+	analyzer := log.New(filePath)
+	result, err := analyzer.Analyze(limit)
+	if err != nil {
+		return fmt.Errorf("failed to analyze log file: %w", err)
+	}
+
+	// Format the analysis result for AI
+	logContent := result.ToFormat()
+
+	fmt.Printf("📊 Found %d log entries\n", result.Total)
+	if len(result.Errors) > 0 {
+		fmt.Printf("   Errors: %d\n", len(result.Errors))
+	}
+	if len(result.Warnings) > 0 {
+		fmt.Printf("   Warnings: %d\n", len(result.Warnings))
+	}
+	fmt.Println()
+
+	// Build log prompt and call LLM
+	messages := llm.BuildLogPrompt(logContent)
+
+	fmt.Println("🔍 Analyzing...")
+	fmt.Println()
+	response, err := client.Chat(messages)
+	if err != nil {
+		return fmt.Errorf("failed to call LLM: %w", err)
+	}
+
+	// Save to session history
+	if a.sessionMgr != nil {
+		_ = a.sessionMgr.Add(session.Entry{
+			Command:  "log",
+			Question: fmt.Sprintf("file:%s (limit:%d)", filePath, limit),
+			Answer:   response.Content,
+			Type:     "log",
+		})
+	}
+
+	// Streaming output is already printed, just add a newline
+	fmt.Println()
+
+	return nil
+}
+
+// AnalyzeLogContent analyzes log content from a string
+func (a *App) AnalyzeLogContent(content string) error {
+	// Initialize LLM client
+	client, err := a.getLLMClient()
+	if err != nil {
+		return err
+	}
+
+	fmt.Println("📋 Analyzing log content...")
+	fmt.Println()
+
+	// Analyze the log content
+	result := log.AnalyzeString(content)
+
+	// Format as analysis result for AI
+	logContent := result.ToFormat()
+
+	fmt.Printf("📊 Found %d log entries\n", result.Total)
+	if len(result.Errors) > 0 {
+		fmt.Printf("   Errors: %d\n", len(result.Errors))
+	}
+	if len(result.Warnings) > 0 {
+		fmt.Printf("   Warnings: %d\n", len(result.Warnings))
+	}
+	fmt.Println()
+
+	// Build log prompt and call LLM
+	messages := llm.BuildLogPrompt(logContent)
+
+	fmt.Println("🔍 Analyzing...")
+	fmt.Println()
+	response, err := client.Chat(messages)
+	if err != nil {
+		return fmt.Errorf("failed to call LLM: %w", err)
+	}
+
+	// Save to session history
+	if a.sessionMgr != nil {
+		_ = a.sessionMgr.Add(session.Entry{
+			Command:  "log",
+			Question: content[:min(len(content), 100)],
+			Answer:   response.Content,
+			Type:     "log",
+		})
+	}
+
+	// Streaming output is already printed, just add a newline
+	fmt.Println()
+
+	return nil
+}
+
+// AnalyzeJournalctlUnit analyzes logs from journalctl for a specific unit
+func (a *App) AnalyzeJournalctlUnit(unit string, limit int) error {
+	// Initialize LLM client
+	client, err := a.getLLMClient()
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("📋 Analyzing journalctl logs for unit: %s\n", unit)
+	fmt.Println()
+
+	// Get logs from journalctl
+	journalContent, err := log.GetJournalctlLogs(unit, limit)
+	if err != nil {
+		return fmt.Errorf("failed to get journalctl logs: %w", err)
+	}
+
+	// Analyze the journal content
+	result := log.AnalyzeString(journalContent)
+
+	// Format as analysis result for AI
+	logContent := result.ToFormat()
+
+	fmt.Printf("📊 Found %d log entries\n", result.Total)
+	if len(result.Errors) > 0 {
+		fmt.Printf("   Errors: %d\n", len(result.Errors))
+	}
+	if len(result.Warnings) > 0 {
+		fmt.Printf("   Warnings: %d\n", len(result.Warnings))
+	}
+	fmt.Println()
+
+	// Build log prompt and call LLM
+	messages := llm.BuildLogPrompt(logContent)
+
+	fmt.Println("🔍 Analyzing...")
+	fmt.Println()
+	response, err := client.Chat(messages)
+	if err != nil {
+		return fmt.Errorf("failed to call LLM: %w", err)
+	}
+
+	// Save to session history
+	if a.sessionMgr != nil {
+		_ = a.sessionMgr.Add(session.Entry{
+			Command:  "journalctl",
+			Question: fmt.Sprintf("unit:%s (limit:%d)", unit, limit),
+			Answer:   response.Content,
+			Type:     "log",
+		})
+	}
+
+	// Streaming output is already printed, just add a newline
+	fmt.Println()
+
+	return nil
 }

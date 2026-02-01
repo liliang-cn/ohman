@@ -66,6 +66,30 @@ func TestBuildDiagnosePrompt(t *testing.T) {
 	}
 }
 
+func TestBuildLogPrompt(t *testing.T) {
+	logContent := `2025-02-01 10:23:45 ERROR Database connection failed
+2025-02-01 10:23:46 WARN Retrying connection
+2025-02-01 10:23:47 INFO Application started`
+
+	messages := BuildLogPrompt(logContent)
+
+	if len(messages) != 2 {
+		t.Errorf("expected 2 messages, got %d", len(messages))
+	}
+
+	if messages[0].Role != "system" {
+		t.Errorf("first message should be system, got %s", messages[0].Role)
+	}
+
+	if !strings.Contains(messages[0].Content, logContent) {
+		t.Error("system prompt should contain log content")
+	}
+
+	if messages[1].Role != "user" {
+		t.Errorf("second message should be user, got %s", messages[1].Role)
+	}
+}
+
 func TestTruncateContent(t *testing.T) {
 	tests := []struct {
 		name     string
