@@ -25,6 +25,17 @@ jobs:
         id: version
         run: echo "VERSION=${GITHUB_REF#refs/tags/}" >> $GITHUB_OUTPUT
 
+      - name: Update version in source
+        run: |
+          VERSION=${{ steps.version.outputs.VERSION }}
+          sed -i "s/Version = \"dev\"/Version = \"${VERSION}\"/" pkg/version/version.go
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: bump version to ${VERSION}"
+          git push origin main
+          git tag -f "${VERSION}"
+          git push origin "${VERSION}" --force
+
       - name: Build binaries
         run: |
           VERSION=${{ steps.version.outputs.VERSION }}
