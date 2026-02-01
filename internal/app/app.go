@@ -1,12 +1,11 @@
 package app
 
 import (
-	"bufio"
 	"fmt"
-	"os"
 	"strings"
 
 	"github.com/liliang-cn/ohman/internal/config"
+	"github.com/liliang-cn/ohman/internal/input"
 	"github.com/liliang-cn/ohman/internal/llm"
 	"github.com/liliang-cn/ohman/internal/log"
 	"github.com/liliang-cn/ohman/internal/man"
@@ -164,17 +163,15 @@ func (a *App) Interactive(command string, section int) error {
 	fmt.Println("   Type your question, or 'exit' / 'quit' to exit")
 	fmt.Println()
 
-	reader := bufio.NewReader(os.Stdin)
+	reader := input.New("❓ ")
 	history := llm.BuildQuestionPrompt(command, manPage.Content, "")
 
 	for {
-		fmt.Print("❓ ")
-		input, err := reader.ReadString('\n')
+		question, err := reader.ReadLine()
 		if err != nil {
 			break
 		}
 
-		question := strings.TrimSpace(input)
 		if question == "" {
 			continue
 		}
@@ -327,16 +324,14 @@ func (a *App) Chat(logContext string) error {
 		fmt.Println()
 	}
 
-	reader := bufio.NewReader(os.Stdin)
+	reader := input.New("❓ ")
 
 	for {
-		fmt.Print("❓ ")
-		input, err := reader.ReadString('\n')
+		question, err := reader.ReadLine()
 		if err != nil {
 			break
 		}
 
-		question := strings.TrimSpace(input)
 		if question == "" {
 			continue
 		}
