@@ -7,7 +7,8 @@
 ## ✨ 特性
 
 - 🔍 **智能问答**: 用自然语言询问任何命令的使用方法
-- 🔧 **失败诊断**: 自动诊断上一个失败的命令并给出修复建议
+- 🔧 **自动修复**: 执行命令，失败时 AI 自动给出修复建议
+- 🔨 **失败诊断**: 自动诊断上一个失败的命令并给出修复建议
 - 💬 **错误分析**: 直接粘贴错误消息，立即获得分析和解决方案
 - 📊 **日志分析**: 分析日志文件、systemd 服务日志或直接粘贴日志内容，获得 AI 驱动的洞察
 - 🔌 **管道支持**: 支持通过管道（pipe）传递日志数据，实现实时分析和过滤
@@ -169,7 +170,26 @@ $ ohman
 # AI 会解释为什么失败并提供正确的方法
 ```
 
-#### 场景 5：直接错误消息分析
+#### 场景 5：自动修复失败命令（新功能！）
+
+```bash
+# 执行命令 - 如果失败，AI 会给出修复建议
+ohman fix git pull
+# 如果 git pull 失败，AI 分析错误并建议：git pull --rebase
+# 确认后执行修复后的命令
+
+# 修复 Docker 命令
+ohman fix docker-compose up
+# AI 检测到缺少 -f 参数或文件名错误
+
+# 修复 npm install 问题
+ohman fix npm install
+# AI 建议使用 --legacy-peer-deps 或其他解决方案
+
+# 最多重试 3 次，每次都需要用户确认
+```
+
+#### 场景 6：直接错误消息分析
 
 ```bash
 # 只需粘贴任何错误消息
@@ -181,7 +201,7 @@ ohman "segmentation fault (core dumped)"
 # AI 会检测错误关键词并提供解决方案
 ```
 
-#### 场景 6：日志分析
+#### 场景 7：日志分析
 
 ```bash
 # 分析日志文件
@@ -197,7 +217,7 @@ ohman log "2025-02-01 10:23:45 [ERROR] Database connection timeout
 # AI 会分析日志，识别错误，并提供解决方案
 ```
 
-#### 场景 7：Systemd 服务日志分析
+#### 场景 8：Systemd 服务日志分析
 
 ```bash
 # 分析 systemd 服务日志
@@ -212,7 +232,7 @@ ohman log --unit mysql.service
 # AI 会分析 journalctl 日志并提供深入洞察
 ```
 
-#### 场景 8：管道支持（新功能！）
+#### 场景 9：管道支持（新功能！）
 
 ```bash
 # 通过管道分析日志
@@ -234,7 +254,7 @@ journalctl -f -u docker | grep ERROR | ohman log
 tail -f /var/log/app.log | grep ERROR | ohman log
 ```
 
-#### 场景 9：会话管理
+#### 场景 10：会话管理
 
 ```bash
 # 查看查询历史
@@ -244,7 +264,7 @@ ohman history
 ohman clear
 ```
 
-#### 场景 10：交互式聊天（新功能！）
+#### 场景 11：交互式聊天（新功能！）
 
 ```bash
 # 启动通用聊天会话
@@ -294,6 +314,7 @@ ohman - AI 驱动的 man 页面助手
   clear       清空会话缓存
   completion  为指定的 shell 生成自动补全脚本
   config      配置 ohman
+  fix         执行命令，失败时自动修复
   help        关于任何命令的帮助
   history     查看会话历史
   log         分析日志文件、systemd 服务日志或通过管道接收日志内容
@@ -312,6 +333,9 @@ ohman - AI 驱动的 man 页面助手
   ohman grep "如何只显示匹配的文件名？"
   ohman -s 5 passwd "配置文件格式是什么？"
   ohman -c /path/to/config.yaml tar "如何解压？"
+  ohman fix git pull
+  ohman fix docker-compose up
+  ohman fix npm install
   ohman log /var/log/app/error.log
   ohman log -n 50 "2025-02-01 ERROR: Connection timeout"
   ohman log -u nginx.service
