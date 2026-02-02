@@ -3,9 +3,10 @@ package exec
 import (
 	"bytes"
 	"fmt"
-	"os/exec"
-	"syscall"
+	"strings"
 	"time"
+
+	pipeit "github.com/liliang-cn/pipeit"
 )
 
 // Result represents the result of a command execution
@@ -21,33 +22,77 @@ type Result struct {
 func Execute(command string) (*Result, error) {
 	start := time.Now()
 
-	// Use sh -c for shell command support
-	cmd := exec.Command("sh", "-c", command)
+	var stdoutBuf, stderrBuf bytes.Buffer
 
-	var stdout, stderr bytes.Buffer
-	cmd.Stdout = &stdout
-	cmd.Stderr = &stderr
+	config := pipeit.Config{
+		Command: "sh",
+		Args:    []string{"-c", command},
+		OnOutput: func(data []byte) {
+			stdoutBuf.Write(data)
+		},
+		OnError: func(data []byte) {
+			stderrBuf.Write(data)
+		},
+	}
 
-	err := cmd.Run()
+	pm := pipeit.NewWithConfig(config)
+	if err := pm.StartWithPipes(); err != nil {
+		return nil, fmt.Errorf("failed to start: %w", err)
+	}
+	defer pm.Stop()
+
+	err := pm.Wait()
 
 	result := &Result{
 		Command:  command,
-		Stdout:   stdout.String(),
-		Stderr:   stderr.String(),
+		Stdout:   stdoutBuf.String(),
+		Stderr:   stderrBuf.String(),
 		Duration: time.Since(start),
 	}
 
 	// Get exit code
 	if err != nil {
-		if exitErr, ok := err.(*exec.ExitError); ok {
-			if status, ok := exitErr.Sys().(syscall.WaitStatus); ok {
-				result.ExitCode = status.ExitStatus()
-			} else {
-				result.ExitCode = 1
-			}
-		} else {
-			result.ExitCode = 1
-		}
+		result.ExitCode = 1
+	}
+
+	return result, nil
+}
+
+// ExecuteWithPTY runs a command with PTY support for interactive programs
+func ExecuteWithPTY(command string) (*Result, error) {
+	start := time.Now()
+
+	var stdoutBuf, stderrBuf bytes.Buffer
+
+	config := pipeit.Config{
+		Command: "sh",
+		Args:    []string{"-c", command},
+		OnOutput: func(data []byte) {
+			stdoutBuf.Write(data)
+		},
+		OnError: func(data []byte) {
+			stderrBuf.Write(data)
+		},
+	}
+
+	pm := pipeit.NewWithConfig(config)
+	if err := pm.StartWithPTY(); err != nil {
+		return nil, fmt.Errorf("failed to start: %w", err)
+	}
+	defer pm.Stop()
+
+	err := pm.Wait()
+
+	result := &Result{
+		Command:  command,
+		Stdout:   stdoutBuf.String(),
+		Stderr:   stderrBuf.String(),
+		Duration: time.Since(start),
+	}
+
+	// Get exit code
+	if err != nil {
+		result.ExitCode = 1
 	}
 
 	return result, nil
@@ -64,4 +109,9 @@ func (r *Result) String() string {
 		return fmt.Sprintf("✓ %s (exit: 0)", r.Command)
 	}
 	return fmt.Sprintf("✗ %s (exit: %d)", r.Command, r.ExitCode)
+}
+
+// HasError returns true if there was any stderr output
+func (r *Result) HasError() bool {
+	return strings.TrimSpace(r.Stderr) != ""
 }
