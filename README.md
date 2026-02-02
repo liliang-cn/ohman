@@ -7,7 +7,8 @@
 ## ✨ Features
 
 - 🔍 **Smart Q&A**: Ask questions about any command in natural language
-- 🔧 **Failure Diagnosis**: Automatically diagnose the last failed command and suggest fixes
+- 🔧 **Auto Fix**: Execute commands and automatically fix failures using AI
+- 🔨 **Failure Diagnosis**: Automatically diagnose the last failed command and suggest fixes
 - 💬 **Error Analysis**: Paste error messages directly for instant analysis and solutions
 - 📊 **Log Analysis**: Analyze log files or paste log content for AI-powered insights
 - 💭 **Interactive Chat**: Start a chat session with AI, optionally with log context
@@ -168,7 +169,26 @@ $ ohman
 # AI will explain why it failed and provide the correct approach
 ```
 
-#### Case 5: Direct Error Message Analysis
+#### Case 5: Auto Fix Failed Commands
+
+```bash
+# Execute a command - if it fails, AI will suggest fixes
+ohman fix git pull
+# If git pull fails, AI analyzes the error and suggests: git pull --rebase
+# Confirm to run the fixed command
+
+# Fix Docker commands
+ohman fix docker-compose up
+# AI detects missing -f flag or wrong file name
+
+# Fix npm install issues
+ohman fix npm install
+# AI suggests --legacy-peer-deps or other solutions
+
+# Max 3 retry attempts with user confirmation each time
+```
+
+#### Case 6: Direct Error Message Analysis
 
 ```bash
 # Simply paste any error message
@@ -180,7 +200,7 @@ ohman "segmentation fault (core dumped)"
 # AI detects error keywords and provides solutions
 ```
 
-#### Case 6: Log Analysis
+#### Case 7: Log Analysis
 
 ```bash
 # Analyze a log file
@@ -194,7 +214,7 @@ ohman log "2025-02-01 10:23:45 [ERROR] Database connection timeout
 2025-02-01 10:23:46 [WARN] Retrying connection..."
 ```
 
-#### Case 7: Pipe Support
+#### Case 8: Pipe Support
 
 ```bash
 # Analyze logs from pipe
@@ -216,7 +236,7 @@ journalctl -f -u docker | grep ERROR | ohman log
 tail -f /var/log/app.log | grep ERROR | ohman log
 ```
 
-#### Case 8: Systemd Journalctl Analysis
+#### Case 9: Systemd Journalctl Analysis
 
 ```bash
 # Analyze systemd service logs
@@ -231,7 +251,7 @@ ohman log --unit mysql.service
 # AI will analyze journalctl logs and provide insights
 ```
 
-#### Case 9: Session Management
+#### Case 10: Session Management
 
 ```bash
 # View your query history
@@ -241,7 +261,7 @@ ohman history
 ohman clear
 ```
 
-#### Case 10: Interactive Chat
+#### Case 11: Interactive Chat
 
 ```bash
 # Start a general chat session
@@ -291,6 +311,7 @@ Available Commands:
   clear       Clear session cache
   completion  Generate the autocompletion script for the specified shell
   config      Configure ohman
+  fix         Execute a command and auto-fix if it fails
   help        Help about any command
   history     View session history
   log         Analyze log files or log content
@@ -309,6 +330,9 @@ Examples:
   ohman grep "How to only show matching filenames?"
   ohman -s 5 passwd "What's the config file format?"
   ohman -c /path/to/config.yaml tar "How to extract?"
+  ohman fix git pull
+  ohman fix docker-compose up
+  ohman fix npm install
   ohman log /var/log/app/error.log
   ohman log -n 50 "2025-02-01 ERROR: Connection timeout"
   ohman log -u nginx.service
