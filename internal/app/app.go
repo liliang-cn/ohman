@@ -2,9 +2,11 @@ package app
 
 import (
 	"fmt"
+	"os"
 	"strings"
 
 	"github.com/liliang-cn/ohman/internal/config"
+	execpkg "github.com/liliang-cn/ohman/internal/exec"
 	"github.com/liliang-cn/ohman/internal/input"
 	"github.com/liliang-cn/ohman/internal/llm"
 	"github.com/liliang-cn/ohman/internal/log"
@@ -548,4 +550,124 @@ func (a *App) AnalyzeJournalctlUnit(unit string, limit int) error {
 	fmt.Println()
 
 	return nil
+}
+
+const maxFixAttempts = 3
+
+// Fix runs a command and automatically fixes it if it fails
+func (a *App) Fix(command string) error {
+	client, err := a.getLLMClient()
+	if err != nil {
+		return err
+	}
+
+	var attempts []llm.FixAttempt
+
+	for round := 0; round < maxFixAttempts; round++ {
+		// Execute current command
+		result, err := execpkg.Execute(command)
+		if err != nil {
+			return fmt.Errorf("failed to execute command: %w", err)
+		}
+
+		// Show output
+		if result.Stdout != "" {
+			fmt.Print(result.Stdout)
+		}
+
+		// Success?
+		if result.Success() {
+			fmt.Println("\n✓ Success!")
+			a.saveFixSession(command, attempts, true)
+			return nil
+		}
+
+		// Failed - show stderr
+		if result.Stderr != "" {
+			fmt.Fprint(os.Stderr, result.Stderr)
+		}
+
+		// Record attempt
+		attempts = append(attempts, llm.FixAttempt{
+			Command:  command,
+			ExitCode: result.ExitCode,
+			Stdout:   result.Stdout,
+			Stderr:   result.Stderr,
+		})
+
+		// Last attempt?
+		if round >= maxFixAttempts-1 {
+			return a.showFixSummary(command, attempts)
+		}
+
+		// Get fix from LLM
+		fmt.Println("\n🔧 Analyzing...")
+		messages := llm.BuildFixPrompt(command, attempts)
+		response, err := client.Chat(messages)
+		if err != nil {
+			return fmt.Errorf("failed to get fix suggestion: %w", err)
+		}
+
+		fixedCmd, err := llm.ExtractCommand(response.Content)
+		if err != nil {
+			return fmt.Errorf("failed to parse LLM response: %w", err)
+		}
+
+		// Confirm
+		fmt.Printf("\n→ %s\n", fixedCmd)
+		if !a.confirmPrompt() {
+			fmt.Println("Cancelled")
+			a.saveFixSession(command, attempts, false)
+			return nil
+		}
+
+		command = fixedCmd
+	}
+
+	return nil
+}
+
+func (a *App) confirmPrompt() bool {
+	fmt.Print("Run? [y/N] ")
+	reader := input.New("")
+	ans, _ := reader.ReadLine()
+	return strings.ToLower(ans) == "y"
+}
+
+func (a *App) saveFixSession(originalCmd string, attempts []llm.FixAttempt, success bool) {
+	if a.sessionMgr == nil {
+		return
+	}
+
+	entryType := "fix"
+	if !success {
+		entryType = "fix-failed"
+	}
+
+	_ = a.sessionMgr.Add(session.Entry{
+		Command:  originalCmd,
+		Question: fmt.Sprintf("Attempts: %d", len(attempts)),
+		Answer:   fmt.Sprintf("Success: %v", success),
+		Type:     entryType,
+	})
+}
+
+func (a *App) showFixSummary(originalCmd string, attempts []llm.FixAttempt) error {
+	fmt.Println("\n❌ Maximum fix attempts reached. Summary:")
+	fmt.Println()
+
+	for i, attempt := range attempts {
+		fmt.Printf("[%d] %s (exit: %d)\n", i+1, attempt.Command, attempt.ExitCode)
+		if attempt.Stderr != "" {
+			errMsg := attempt.Stderr
+			if len(errMsg) > 100 {
+				errMsg = errMsg[:100] + "..."
+			}
+			fmt.Printf("    Error: %s\n", errMsg)
+		}
+		fmt.Println()
+	}
+
+	a.saveFixSession(originalCmd, attempts, false)
+	return fmt.Errorf("command failed after %d fix attempts", len(attempts))
 }

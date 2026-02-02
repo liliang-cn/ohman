@@ -73,6 +73,17 @@ One-line explanation if needed.
 %s
 === END OF ERROR ===`
 
+const systemPromptFix = `You are a command fixing assistant. Analyze the failed command and return ONLY the fixed command.
+
+CRITICAL OUTPUT FORMAT:
+- Return ONLY the fixed shell command
+- Wrap exactly in: __CMD__your command here__CMD__
+- NO explanations, NO markdown, NO "here is" prefixes
+
+Example: __CMD__git pull --rebase__CMD__
+
+If multiple fixes are possible, choose the most likely one. Context includes previous attempts - don't repeat them.`
+
 const systemPromptLog = `You are a log analysis expert. Analyze the following log content and provide insights.
 
 When analyzing:
@@ -179,6 +190,83 @@ func BuildLogPrompt(logContent string) []Message {
 			Content: "Please analyze these logs and provide solutions for any issues found.",
 		},
 	}
+}
+
+// FixAttempt represents a single fix attempt for context
+type FixAttempt struct {
+	Command  string
+	ExitCode int
+	Stdout   string
+	Stderr   string
+}
+
+// BuildFixPrompt builds messages for command fixing
+func BuildFixPrompt(originalCommand string, attempts []FixAttempt) []Message {
+	var ctx strings.Builder
+	ctx.WriteString(fmt.Sprintf("Original command: %s\n\n", originalCommand))
+
+	if len(attempts) > 0 {
+		ctx.WriteString("Previous attempts:\n")
+		for i, a := range attempts {
+			ctx.WriteString(fmt.Sprintf("\n[Attempt %d]\n", i+1))
+			ctx.WriteString(fmt.Sprintf("Command: %s\n", a.Command))
+			ctx.WriteString(fmt.Sprintf("Exit code: %d\n", a.ExitCode))
+			if a.Stderr != "" {
+				ctx.WriteString(fmt.Sprintf("Error: %s\n", truncateContent(a.Stderr, 500)))
+			}
+			if a.Stdout != "" {
+				ctx.WriteString(fmt.Sprintf("Output: %s\n", truncateContent(a.Stdout, 200)))
+			}
+		}
+	}
+
+	return []Message{
+		{
+			Role:    "system",
+			Content: systemPromptFix,
+		},
+		{
+			Role:    "user",
+			Content: ctx.String(),
+		},
+	}
+}
+
+// ExtractCommand extracts the fixed command from LLM response
+func ExtractCommand(response string) (string, error) {
+	response = strings.TrimSpace(response)
+
+	// Try to extract using __CMD__ tags first
+	if start := strings.Index(response, "__CMD__"); start != -1 {
+		start += len("__CMD__")
+		if end := strings.Index(response[start:], "__CMD__"); end != -1 {
+			cmd := strings.TrimSpace(response[start : start+end])
+			if cmd != "" {
+				return cmd, nil
+			}
+		}
+	}
+
+	// Fallback: extract from markdown code block
+	lines := strings.Split(response, "\n")
+	inCodeBlock := false
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "```bash" || trimmed == "```sh" || trimmed == "```" {
+			inCodeBlock = !inCodeBlock
+			continue
+		}
+		if inCodeBlock && trimmed != "" {
+			return trimmed, nil
+		}
+	}
+
+	// Last resort: if response is short and looks like a command
+	if len(response) < 200 && !strings.ContainsAny(response, "\n") {
+		return response, nil
+	}
+
+	return "", fmt.Errorf("no command found in response")
 }
 
 // truncateContent truncates content to specified character count

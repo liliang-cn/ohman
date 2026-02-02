@@ -65,6 +65,7 @@ func init() {
 	rootCmd.AddCommand(clearCmd)
 	rootCmd.AddCommand(logCmd)
 	rootCmd.AddCommand(chatCmd)
+	rootCmd.AddCommand(fixCmd)
 }
 
 func initConfig() {
@@ -330,6 +331,15 @@ func runHistory(cmd *cobra.Command, args []string) error {
 			if entry.Question != "" {
 				fmt.Printf("      Error: %s\n", truncateString(entry.Question, 60))
 			}
+		case "fix", "fix-failed":
+			if entry.Type == "fix" {
+				fmt.Printf("      Type: Command Fix (Success)\n")
+			} else {
+				fmt.Printf("      Type: Command Fix (Failed)\n")
+			}
+			if entry.Question != "" {
+				fmt.Printf("      %s\n", truncateString(entry.Question, 60))
+			}
 		default:
 			fmt.Printf("      Command: %s\n", entry.Command)
 			switch entry.Type {
@@ -464,4 +474,44 @@ func runChat(cmd *cobra.Command, args []string) error {
 
 	// Start interactive chat
 	return application.Chat(logContext)
+}
+
+// fixCmd is the fix command
+var fixCmd = &cobra.Command{
+	Use:   "fix <command>",
+	Short: "Execute a command and auto-fix if it fails",
+	Long: `Execute a command and automatically fix it using AI if it fails.
+
+If the command succeeds, the output is shown normally.
+If it fails, ohman will analyze the error and suggest a fixed command.
+You can choose to run the fixed command or cancel.
+
+This process repeats up to 3 times if fixes continue to fail.
+
+Examples:
+  ohman fix git pull              Fix git pull if it fails
+  ohman fix docker-compose up     Fix docker-compose if it fails
+  ohman fix npm install            Fix npm install if it fails`,
+	Args:                  cobra.MinimumNArgs(1),
+	DisableFlagsInUseLine: true,
+	RunE:                  runFix,
+}
+
+func runFix(cmd *cobra.Command, args []string) error {
+	cfg, err := config.Load()
+	if err != nil {
+		return fmt.Errorf("failed to load config: %w", err)
+	}
+
+	// Override model config
+	if model != "" {
+		cfg.LLM.Model = model
+	}
+
+	application := app.New(cfg)
+
+	// Join all arguments into the command
+	command := strings.Join(args, " ")
+
+	return application.Fix(command)
 }
